@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ComponentProps } from "react";
 import { Canvas } from "@react-three/fiber";
 import { Environment, Sparkles, Stars } from "@react-three/drei";
@@ -9,6 +9,7 @@ import { World } from "@/game/World";
 import { CameraRig } from "@/game/CameraRig";
 import { trpc } from "@/utils/trpc";
 import type { DailyAtmosphere, WeatherPreset } from "@/core/types";
+import { applyPlaybackJitter, getAudioLayersForWeather } from "@/core/audioScenes";
 
 const DEFAULT_ATMOSPHERE: Required<
   Pick<
@@ -42,76 +43,121 @@ const ENV_PRESET: Record<WeatherPreset, ComponentProps<typeof Environment>["pres
   ember: "studio",
 };
 
-const AUDIO_TONES: Record<NonNullable<DailyAtmosphere["audioCue"]>, number> = {
-  chimes: 480,
-  pulse: 320,
-  storm: 140,
-  lullaby: 260,
-  embers: 180,
+const fadeVolume = (
+  audio: HTMLAudioElement,
+  target: number,
+  duration = 2500,
+  onComplete?: () => void,
+) => {
+  const startVolume = audio.volume;
+  const startTime = performance.now();
+  const tick = (now: number) => {
+    const progress = Math.min(1, (now - startTime) / duration);
+    const next = startVolume + (target - startVolume) * progress;
+    audio.volume = Math.min(1, Math.max(0, next));
+    if (progress < 1) {
+      requestAnimationFrame(tick);
+    } else if (onComplete) {
+      onComplete();
+    }
+  };
+  requestAnimationFrame(tick);
 };
 
-const AUDIO_TYPES: Record<NonNullable<DailyAtmosphere["audioCue"]>, OscillatorType> = {
-  chimes: "sine",
-  pulse: "triangle",
-  storm: "sawtooth",
-  lullaby: "square",
-  embers: "triangle",
-};
+const useAmbientAudio = (weather: WeatherPreset) => {
+  const [unlocked, setUnlocked] = useState(false);
+  const activeLayersRef = useRef<Map<string, HTMLAudioElement>>(new Map());
+  const weatherRef = useRef<WeatherPreset | null>(null);
 
-const useDailyAudioCue = (cue?: DailyAtmosphere["audioCue"]) => {
   useEffect(() => {
-    if (!cue || typeof window === "undefined") return;
-
-    let audioCtx: AudioContext | null = null;
-    let oscillator: OscillatorNode | null = null;
-    let gain: GainNode | null = null;
-    let mounted = true;
-
-    const enable = () => {
-      if (!mounted || audioCtx) {
-        return;
-      }
-      audioCtx = new window.AudioContext();
-      gain = audioCtx.createGain();
-      gain.gain.value = 0.0005;
-      oscillator = audioCtx.createOscillator();
-      oscillator.type = AUDIO_TYPES[cue] ?? "sine";
-      oscillator.frequency.value = AUDIO_TONES[cue] ?? 320;
-      oscillator.connect(gain).connect(audioCtx.destination);
-      oscillator.start();
-    };
-
+    if (typeof window === "undefined") return;
     const unlock = () => {
-      if (
-        audioCtx &&
-        audioCtx.state === "suspended" &&
-        typeof audioCtx.resume === "function"
-      ) {
-        audioCtx
-          .resume()
-          .catch(() => {
-            /* noop */
-          });
-      } else if (!audioCtx) {
-        enable();
-      }
+      setUnlocked(true);
     };
-
     window.addEventListener("pointerdown", unlock, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", unlock);
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      activeLayersRef.current.forEach((audio) => {
+        audio.pause();
+        audio.src = "";
+      });
+      activeLayersRef.current.clear();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!unlocked) return;
+    if (weatherRef.current === weather) return;
+    weatherRef.current = weather;
+
+    const configs = getAudioLayersForWeather(weather);
+    const newLayers = new Map<string, HTMLAudioElement>();
+    const cleanup: Array<() => void> = [];
+
+    configs.forEach((config) => {
+      const audio = new Audio();
+      audio.src = config.src;
+      audio.loop = true;
+      audio.preload = "auto";
+      audio.crossOrigin = "anonymous";
+      audio.volume = 0;
+      applyPlaybackJitter(audio, config);
+
+      const startPlayback = () => {
+        audio
+          .play()
+          .then(() => {
+            fadeVolume(audio, config.volume, config.fadeInMs ?? 3000);
+          })
+          .catch((error) => {
+            console.warn("[audio] Lecture impossible", config.src, error);
+          });
+      };
+
+      const handleLoaded = () => {
+        audio.removeEventListener("loadeddata", handleLoaded);
+        if (config.offsetMs && audio.duration > 0) {
+          const offsetSeconds = (config.offsetMs % (audio.duration * 1000)) / 1000;
+          audio.currentTime = offsetSeconds;
+        }
+        startPlayback();
+      };
+
+      audio.addEventListener("loadeddata", handleLoaded);
+      const fallbackStart = window.setTimeout(startPlayback, 5000);
+      const errorListener = () => {
+        console.warn("[audio] Fichier introuvable:", config.src);
+      };
+      audio.addEventListener("error", errorListener);
+
+      cleanup.push(() => {
+        window.clearTimeout(fallbackStart);
+        audio.removeEventListener("loadeddata", handleLoaded);
+        audio.removeEventListener("error", errorListener);
+      });
+
+      newLayers.set(config.id, audio);
+    });
+
+    const previousLayers = activeLayersRef.current;
+    previousLayers.forEach((audio) => {
+      fadeVolume(audio, 0, 2000, () => {
+        audio.pause();
+        audio.src = "";
+      });
+    });
+
+    activeLayersRef.current = newLayers;
 
     return () => {
-      mounted = false;
-      window.removeEventListener("pointerdown", unlock);
-      oscillator?.stop();
-      oscillator?.disconnect();
-      gain?.disconnect();
-      if (audioCtx && audioCtx.state !== "closed") {
-        audioCtx.close().catch(() => {
-          /* noop */
-        });
-      }
+      cleanup.forEach((fn) => fn());
     };
-  }, [cue]);
+  }, [unlocked, weather]);
 };
 
 const WeatherParticles = ({
@@ -150,7 +196,7 @@ export function GameCanvas() {
   const fogRange = atmosphere.fogRange ?? DEFAULT_ATMOSPHERE.fogRange;
   const environmentPreset = ENV_PRESET[atmosphere.weather] ?? "sunset";
 
-  useDailyAudioCue(atmosphere.audioCue);
+  useAmbientAudio(atmosphere.weather);
 
   return (
     <Canvas
