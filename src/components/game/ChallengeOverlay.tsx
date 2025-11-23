@@ -25,6 +25,15 @@ export function ChallengeOverlay() {
   const upsert = trpc.progress.upsert.useMutation({
     onSuccess: (data) => hydrate(data),
   });
+  const utils = trpc.useUtils();
+  const dailyChallenge = trpc.daily.current.useQuery(undefined, { staleTime: 30_000 });
+  const claimDaily = trpc.daily.claim.useMutation({
+    onSuccess: (data) => {
+      hydrate(data.progress);
+      utils.daily.current.invalidate();
+      utils.daily.leaderboard.invalidate();
+    },
+  });
   const telemetry = trpc.telemetry.emit.useMutation();
   const emitTelemetry = (eventType: string, payload?: Record<string, unknown>) => {
     telemetry.mutate({ eventType, payload });
@@ -50,11 +59,23 @@ export function ChallengeOverlay() {
       logsCount: sandboxResult.logs.length,
       codeSize: code.length,
     });
-    if (validation.success) {
-      const newState = completeZone(zoneId);
-      upsert.mutate(newState);
-      resetHintLevel(zoneId);
-    }
+      if (validation.success) {
+        const newState = completeZone(zoneId);
+        upsert.mutate(newState);
+        resetHintLevel(zoneId);
+        if (
+          dailyChallenge.data &&
+          dailyChallenge.data.zoneId === zoneId &&
+          !dailyChallenge.data.alreadyCompleted
+        ) {
+          claimDaily.mutate({ zoneId });
+          emitTelemetry("daily_challenge_completed", {
+            zoneId,
+            bonusXp: dailyChallenge.data.bonusXp,
+            badge: dailyChallenge.data.bonusBadge,
+          });
+        }
+      }
     if (!validation.success) {
       const nextLevel = increaseHintLevel(zoneId);
       emitTelemetry("mentor_hint_level_changed", {

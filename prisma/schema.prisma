@@ -20,6 +20,7 @@ model User {
   progress          Progress?
   challengeStatuses ChallengeStatus[]
   events            EventLog[]
+  dailyResults      DailyChallengeResult[]
 }
 
 model Progress {
@@ -34,6 +35,7 @@ model Progress {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   user             User     @relation(fields: [userId], references: [id])
+  dailyResults     DailyChallengeResult[]
 }
 
 model ChallengeStatus {
@@ -58,4 +60,19 @@ model EventLog {
   user      User     @relation(fields: [userId], references: [id])
 
   @@index([eventType])
+}
+
+model DailyChallengeResult {
+  id            String   @id @default(cuid())
+  userId        String
+  challengeId   String
+  challengeDate DateTime
+  bonusXp       Int      @default(0)
+  rewardBadge   String?
+  createdAt     DateTime @default(now())
+  user          User     @relation(fields: [userId], references: [id])
+  progress      Progress @relation(fields: [userId], references: [userId])
+
+  @@index([challengeDate])
+  @@unique([userId, challengeDate])
 }

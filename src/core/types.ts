@@ -95,6 +95,40 @@ export interface ChallengeReward {
   badge?: string;
 }
 
+export interface DailyChallenge {
+  id: string;
+  zoneId: ZoneId;
+  title: string;
+  bonusXp: number;
+  bonusBadge?: string;
+  seed: string;
+  expiresAt: string;
+}
+
+export interface DailyChallengeSnapshot extends DailyChallenge {
+  alreadyCompleted: boolean;
+}
+
+export interface LeaderboardEntry {
+  userId: string;
+  displayName?: string | null;
+  xp: number;
+  badges: string[];
+  rank: number;
+}
+
+export interface RetentionMetrics {
+  windowDays: number;
+  totalCompletions: number;
+  uniquePlayers: number;
+  dailyBreakdown: {
+    date: string;
+    completions: number;
+    uniquePlayers: number;
+  }[];
+  completionRate?: number;
+}
+
 export type ChallengeMap = Record<ZoneId, ChallengeDefinition>;
 
 export interface UserProgressPayload extends ProgressState {

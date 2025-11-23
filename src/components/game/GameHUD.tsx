@@ -51,6 +51,14 @@ export function GameHUD() {
       return acc;
     }, []);
   }, []);
+  const dailyChallengeQuery = trpc.daily.current.useQuery(undefined, {
+    staleTime: 30_000,
+  });
+  const leaderboardQuery = trpc.daily.leaderboard.useQuery(undefined, {
+    staleTime: 60_000,
+  });
+  const dailyChallenge = dailyChallengeQuery.data;
+  const leaderboard = leaderboardQuery.data ?? [];
   const codexZoneId = codex.zoneId ?? activeZone;
   const codexZone = zoneById[codexZoneId];
   const codexChallenge = challenges[codexZoneId];
@@ -58,7 +66,7 @@ export function GameHUD() {
   return (
     <>
       <section className="pointer-events-none absolute left-6 top-6 flex w-[380px] flex-col gap-4">
-        <Card className="pointer-events-auto">
+          <Card className="pointer-events-auto">
           <header>
             <p className="text-xs uppercase text-dusk/60">Zone actuelle</p>
             <h2 className="text-2xl font-semibold text-dusk">{currentZone.name}</h2>
@@ -118,7 +126,7 @@ export function GameHUD() {
             </Button>
           </footer>
         </Card>
-        <Card className="pointer-events-auto">
+          <Card className="pointer-events-auto">
           <header>
             <p className="text-xs uppercase text-dusk/60">Mentorat</p>
             <h3 className="text-xl font-semibold text-dusk">
@@ -139,7 +147,72 @@ export function GameHUD() {
           <p className="mt-4 text-xs italic text-dusk/60">{currentChallenge.narrative.intro}</p>
         </Card>
       </section>
-      <Modal open={codex.isOpen} onClose={closeCodex}>
+        {dailyChallenge ? (
+          <section className="pointer-events-auto absolute right-6 top-6 flex w-[360px] flex-col gap-4">
+            <Card>
+              <header>
+                <p className="text-xs uppercase text-dusk/60">Défi quotidien</p>
+                <h3 className="text-xl font-semibold text-dusk">{dailyChallenge.title}</h3>
+                <p className="text-sm text-dusk/70">
+                  Zone : {zoneById[dailyChallenge.zoneId].name}
+                </p>
+              </header>
+              <dl className="mt-4 space-y-2 text-sm text-dusk/80">
+                <div className="flex items-center justify-between">
+                  <dt className="text-xs uppercase text-dusk/50">Bonus XP</dt>
+                  <dd className="font-semibold text-dusk">{dailyChallenge.bonusXp} XP</dd>
+                </div>
+                {dailyChallenge.bonusBadge ? (
+                  <div className="flex items-center justify-between">
+                    <dt className="text-xs uppercase text-dusk/50">Récompense</dt>
+                    <dd className="rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-dusk">
+                      {dailyChallenge.bonusBadge}
+                    </dd>
+                  </div>
+                ) : null}
+                <div className="flex items-center justify-between text-xs text-dusk/60">
+                  <span>Expire</span>
+                  <time dateTime={dailyChallenge.expiresAt}>
+                    {new Date(dailyChallenge.expiresAt).toLocaleTimeString("fr-FR", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </time>
+                </div>
+              </dl>
+              <Button
+                className="mt-4 w-full"
+                intent={dailyChallenge.alreadyCompleted ? "ghost" : "primary"}
+                disabled={dailyChallenge.alreadyCompleted}
+                onClick={() => openChallenge(dailyChallenge.zoneId)}
+              >
+                {dailyChallenge.alreadyCompleted ? "Défi validé" : "Relever le défi"}
+              </Button>
+            </Card>
+            {leaderboard.length ? (
+              <Card>
+                <header className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs uppercase text-dusk/60">Classement XP</p>
+                    <h3 className="text-lg font-semibold text-dusk">Top explorateurs</h3>
+                  </div>
+                  <span className="text-xs text-dusk/50">Actualisé</span>
+                </header>
+                <ol className="mt-4 space-y-2 text-sm text-dusk/80">
+                  {leaderboard.slice(0, 5).map((entry) => (
+                    <li key={entry.userId} className="flex items-center justify-between rounded-2xl bg-white/70 px-3 py-2">
+                      <span className="font-semibold text-dusk">
+                        #{entry.rank} {entry.displayName ?? "Anonyme"}
+                      </span>
+                      <span className="text-xs text-dusk/60">{entry.xp} XP</span>
+                    </li>
+                  ))}
+                </ol>
+              </Card>
+            ) : null}
+          </section>
+        ) : null}
+        <Modal open={codex.isOpen} onClose={closeCodex}>
         <section className="flex h-[65vh] flex-col gap-4" aria-labelledby="codex-title">
           <header className="flex items-start justify-between gap-4">
             <div>
