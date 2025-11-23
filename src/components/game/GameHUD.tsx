@@ -180,6 +180,7 @@ export function GameHUD() {
                   </time>
                 </div>
               </dl>
+              <p className="mt-3 text-sm text-dusk/70">{dailyChallenge.narrative.intro}</p>
               <Button
                 className="mt-4 w-full"
                 intent={dailyChallenge.alreadyCompleted ? "ghost" : "primary"}

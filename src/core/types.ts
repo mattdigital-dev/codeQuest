@@ -103,10 +103,18 @@ export interface DailyChallenge {
   bonusBadge?: string;
   seed: string;
   expiresAt: string;
+  narrative: DailyChallengeNarrative;
 }
 
 export interface DailyChallengeSnapshot extends DailyChallenge {
   alreadyCompleted: boolean;
+}
+
+export interface DailyChallengeNarrative {
+  intro: string;
+  success: string;
+  failure: string;
+  hints: string[];
 }
 
 export interface LeaderboardEntry {

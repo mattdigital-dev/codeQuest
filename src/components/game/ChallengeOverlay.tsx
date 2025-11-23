@@ -38,6 +38,10 @@ export function ChallengeOverlay() {
   const emitTelemetry = (eventType: string, payload?: Record<string, unknown>) => {
     telemetry.mutate({ eventType, payload });
   };
+  const activeDailyChallenge =
+    overlay.zoneId && dailyChallenge.data && dailyChallenge.data.zoneId === overlay.zoneId
+      ? dailyChallenge.data
+      : null;
 
   const runChallenge = async () => {
     if (!challenge || !overlay.zoneId) return;
@@ -98,16 +102,29 @@ export function ChallengeOverlay() {
     if (!challenge) {
       return "";
     }
+    if (activeDailyChallenge) {
+      if (!feedback) {
+        return activeDailyChallenge.narrative.intro;
+      }
+      return feedback.success
+        ? activeDailyChallenge.narrative.success
+        : activeDailyChallenge.narrative.failure;
+    }
     if (!feedback) {
       return challenge.narrative.intro;
     }
     return feedback.success ? challenge.narrative.success : challenge.narrative.failure;
-  }, [challenge, feedback]);
+  }, [challenge, feedback, activeDailyChallenge]);
 
   const hintLevel = overlay.zoneId ? mentorHints[overlay.zoneId] ?? 0 : 0;
   const adaptiveHint = useMemo(() => {
     if (!challenge || hintLevel <= 0) {
       return null;
+    }
+    const dailyHints = activeDailyChallenge?.narrative.hints ?? [];
+    if (activeDailyChallenge && dailyHints.length) {
+      const index = Math.min(dailyHints.length - 1, hintLevel - 1);
+      return dailyHints[index];
     }
     if (hintLevel === 1) {
       return challenge.hint ?? challenge.adaptiveHints?.[0] ?? null;
@@ -118,15 +135,25 @@ export function ChallengeOverlay() {
     }
     const index = Math.min(hints.length - 1, hintLevel - 2);
     return hints[index];
-  }, [challenge, hintLevel]);
+  }, [challenge, hintLevel, activeDailyChallenge]);
+
+  const baseHint = activeDailyChallenge?.narrative.hints[0] ?? challenge?.hint;
+  const displayedHint = adaptiveHint ?? baseHint ?? null;
 
   return (
     <Modal open={overlay.isOpen} onClose={close}>
       {challenge ? (
         <section className="flex h-[70vh] flex-col gap-4" aria-labelledby="challenge-title">
-          <header className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <p className="text-xs uppercase text-dusk/60">{challenge.zoneName}</p>
+            <header className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs uppercase text-dusk/60">{challenge.zoneName}</p>
+                  {activeDailyChallenge ? (
+                    <span className="rounded-full bg-lagoon/30 px-3 py-1 text-[10px] font-semibold uppercase text-dusk">
+                      Défi quotidien
+                    </span>
+                  ) : null}
+                </div>
               <h2 id="challenge-title" className="text-2xl font-semibold text-dusk">
                 {challenge.title}
               </h2>
@@ -180,9 +207,9 @@ export function ChallengeOverlay() {
                   </p>
                 </header>
                 <p className="mt-2 text-sm text-dusk/80">{mentorLine}</p>
-                {challenge.hint ? (
-                  <p className="mt-3 text-xs italic text-dusk/60">Indice : {challenge.hint}</p>
-                ) : null}
+                  {displayedHint ? (
+                    <p className="mt-3 text-xs italic text-dusk/60">Indice : {displayedHint}</p>
+                  ) : null}
               </section>
               <section
                 aria-labelledby="execution-title"

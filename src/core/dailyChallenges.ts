@@ -1,3 +1,4 @@
+import { DAILY_NARRATIVE_SCRIPTS } from "@/content/dailyScripts";
 import { ZONE_SEQUENCE, zoneById, type DailyChallenge, type ZoneId } from "./types";
 
 const BADGE_POOL = [
@@ -34,6 +35,20 @@ const createTitle = (zoneId: ZoneId) => {
   return `Défi quotidien · ${zone.name}`;
 };
 
+type NarrativeScript = (typeof DAILY_NARRATIVE_SCRIPTS)[number];
+
+const scriptsByZone = DAILY_NARRATIVE_SCRIPTS.reduce<Record<ZoneId, NarrativeScript[]>>((acc, script) => {
+  const list = acc[script.zoneId] ?? [];
+  list.push(script);
+  acc[script.zoneId] = list;
+  return acc;
+}, {} as Record<ZoneId, NarrativeScript[]>);
+
+const pickNarrative = (zoneId: ZoneId, seed: number) => {
+  const scripts = scriptsByZone[zoneId] ?? DAILY_NARRATIVE_SCRIPTS;
+  return scripts[seed % scripts.length];
+};
+
 export const generateDailyChallenge = (inputDate = new Date()): DailyChallenge => {
   const dayStart = toStartOfUTCDate(inputDate);
   const id = dayStart.toISOString().slice(0, 10);
@@ -44,6 +59,7 @@ export const generateDailyChallenge = (inputDate = new Date()): DailyChallenge =
   const bonusXp = 80 + (hashed % 90);
   const badgeName = BADGE_POOL[hashed % BADGE_POOL.length];
   const expiresAt = addDays(dayStart, 1).toISOString();
+  const narrative = pickNarrative(zoneId, hashed);
 
   return {
     id,
@@ -53,5 +69,6 @@ export const generateDailyChallenge = (inputDate = new Date()): DailyChallenge =
     bonusBadge: badgeName,
     seed,
     expiresAt,
+    narrative,
   };
 };
