@@ -6,6 +6,28 @@ export const villageChallenge: ChallengeDefinition = {
   title: "Réveiller le cristal",
   description:
     "Active le cristal central en allumant la lumière adéquate. Utilise un bloc d'action simple pour envoyer un signal.",
+  objectives: [
+    {
+      id: "activate-crystal",
+      label: "Allumer le cristal central",
+      description: "Déclenche la lumière `crystal` afin de réveiller l'île.",
+    },
+    {
+      id: "share-signal",
+      label: "Partager un salut lumineux",
+      description: "Optionnel : envoie un message via `text_print` pour saluer les habitants.",
+      optional: true,
+    },
+  ],
+  narrative: {
+    mentor: {
+      name: "Aïko",
+      title: "Veilleuse du Village",
+    },
+    intro: "Approche, apprenti·e : le cristal sommeille. Une simple impulsion bien orientée suffit.",
+    success: "La cloche solaire résonne — ton signal est net, le pont suivant s'éveille.",
+    failure: "Le cristal reste muet. Observe le bloc ciblé et l'état envoyé avant de réessayer.",
+  },
   toolboxXml: `
 <xml xmlns="https://developers.google.com/blockly/xml">
   <category name="Actions" colour="#f6a356">
@@ -28,6 +50,10 @@ export const villageChallenge: ChallengeDefinition = {
 </xml>
 `,
   allowedBlocks: ["world_set_light", "text_print"],
+  hint: "Sélectionne la lumière `crystal` et règle son état sur TRUE avant d'exécuter.",
+  rewards: {
+    xp: 50,
+  },
   validate: (result) => {
     const lights = (result.state.lights as Record<string, boolean>) ?? {};
     if (lights.crystal) {
