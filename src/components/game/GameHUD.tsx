@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ProgressBar } from "@/components/ui/ProgressBar";
@@ -13,7 +13,7 @@ import { trpc } from "@/utils/trpc";
 import { challenges } from "@/blockly/challenges";
 
 export function GameHUD() {
-  const { hydrate, completedZones, activeZone } = useGameStore();
+  const { hydrate, completedZones, activeZone, xp, badges } = useGameStore();
   const { openChallenge, openCodex, closeCodex, codex } = useUIStore();
 
   useEffect(() => {
@@ -36,12 +36,21 @@ export function GameHUD() {
     (sum, zone) => sum + (challenges[zone.id]?.rewards?.xp ?? 0),
     0,
   );
-  const earnedXp = completedZones.reduce(
-    (sum, zoneId) => sum + (challenges[zoneId]?.rewards?.xp ?? 0),
-    0,
-  );
+  const earnedXp = xp;
   const nextZoneIndex = ZONES.findIndex((zone) => zone.id === activeZone) + 1;
   const nextZone = ZONES[nextZoneIndex];
+  const badgeCatalog = useMemo(() => {
+    const seen = new Set<string>();
+    return Object.values(challenges).reduce<string[]>((acc, challenge) => {
+      const badge = challenge.rewards?.badge;
+      if (!badge || seen.has(badge)) {
+        return acc;
+      }
+      seen.add(badge);
+      acc.push(badge);
+      return acc;
+    }, []);
+  }, []);
   const codexZoneId = codex.zoneId ?? activeZone;
   const codexZone = zoneById[codexZoneId];
   const codexChallenge = challenges[codexZoneId];
@@ -61,6 +70,28 @@ export function GameHUD() {
               {completedZones.length} / {totalZones} défis maîtrisés
             </p>
           </section>
+            {badgeCatalog.length ? (
+              <section className="mt-4 space-y-2" aria-label="Badges débloqués">
+                <p className="text-xs text-dusk/60">
+                  {badges.length} / {badgeCatalog.length} badges obtenus
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {badgeCatalog.map((badgeName) => {
+                    const unlocked = badges.includes(badgeName);
+                    return (
+                      <span
+                        key={badgeName}
+                        className={`rounded-full px-3 py-1 text-xs ${
+                          unlocked ? "bg-lagoon/40 text-dusk" : "bg-dusk/10 text-dusk/50"
+                        }`}
+                      >
+                        {badgeName}
+                      </span>
+                    );
+                  })}
+                </div>
+              </section>
+            ) : null}
           <section className="mt-4 space-y-2" aria-label="Expérience obtenue">
             <ProgressBar value={earnedXp} total={totalXpPool || 1} />
             <p className="text-xs text-dusk/60">

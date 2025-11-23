@@ -30,12 +30,16 @@ export interface ProgressState {
   unlockedZones: ZoneId[];
   completedZones: ZoneId[];
   lastChallengeId?: ZoneId;
+  xp: number;
+  badges: string[];
 }
 
 export const initialProgressState: ProgressState = {
   activeZone: "village",
   unlockedZones: ["village"],
   completedZones: [],
+  xp: 0,
+  badges: [],
 };
 
 export interface SandboxExecutionResult {
@@ -63,6 +67,7 @@ export interface ChallengeDefinition {
   allowedBlocks: string[];
   validate: (result: SandboxExecutionResult) => ChallengeResult;
   hint?: string;
+  adaptiveHints?: string[];
   rewards?: ChallengeReward;
 }
 

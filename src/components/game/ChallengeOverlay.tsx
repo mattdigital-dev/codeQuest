@@ -13,7 +13,7 @@ import { trpc } from "@/utils/trpc";
 import type { ChallengeResult } from "@/core/types";
 
 export function ChallengeOverlay() {
-  const { overlay, closeChallenge } = useUIStore();
+  const { overlay, closeChallenge, mentorHints, increaseHintLevel, resetHintLevel } = useUIStore();
   const { completeZone, hydrate } = useGameStore();
   const [code, setCode] = useState("");
   const [isRunning, setIsRunning] = useState(false);
@@ -25,17 +25,44 @@ export function ChallengeOverlay() {
   const upsert = trpc.progress.upsert.useMutation({
     onSuccess: (data) => hydrate(data),
   });
+  const telemetry = trpc.telemetry.emit.useMutation();
+  const emitTelemetry = (eventType: string, payload?: Record<string, unknown>) => {
+    telemetry.mutate({ eventType, payload });
+  };
 
   const runChallenge = async () => {
     if (!challenge || !overlay.zoneId) return;
     setIsRunning(true);
+    const startTimestamp = typeof performance !== "undefined" ? performance.now() : Date.now();
     const sandboxResult = await executeBlocklyCode({ code });
     setLogs(sandboxResult.logs);
     const validation = challenge.validate(sandboxResult);
     setFeedback(validation);
+    const durationMs =
+      (typeof performance !== "undefined" ? performance.now() : Date.now()) - startTimestamp;
+    const zoneId = overlay.zoneId;
+    const currentHintLevel = mentorHints[zoneId] ?? 0;
+    emitTelemetry("challenge_attempt", {
+      zoneId,
+      success: validation.success,
+      durationMs: Math.round(durationMs),
+      hintLevel: currentHintLevel,
+      logsCount: sandboxResult.logs.length,
+      codeSize: code.length,
+    });
     if (validation.success) {
-      const newState = completeZone(overlay.zoneId);
+      const newState = completeZone(zoneId);
       upsert.mutate(newState);
+      resetHintLevel(zoneId);
+    }
+    if (!validation.success) {
+      const nextLevel = increaseHintLevel(zoneId);
+      emitTelemetry("mentor_hint_level_changed", {
+        zoneId,
+        from: currentHintLevel,
+        to: nextLevel,
+        lastMessage: validation.message,
+      });
     }
     setIsRunning(false);
   };
@@ -55,6 +82,22 @@ export function ChallengeOverlay() {
     }
     return feedback.success ? challenge.narrative.success : challenge.narrative.failure;
   }, [challenge, feedback]);
+
+  const hintLevel = overlay.zoneId ? mentorHints[overlay.zoneId] ?? 0 : 0;
+  const adaptiveHint = useMemo(() => {
+    if (!challenge || hintLevel <= 0) {
+      return null;
+    }
+    if (hintLevel === 1) {
+      return challenge.hint ?? challenge.adaptiveHints?.[0] ?? null;
+    }
+    const hints = challenge.adaptiveHints ?? [];
+    if (!hints.length) {
+      return challenge.hint ?? null;
+    }
+    const index = Math.min(hints.length - 1, hintLevel - 2);
+    return hints[index];
+  }, [challenge, hintLevel]);
 
   return (
     <Modal open={overlay.isOpen} onClose={close}>

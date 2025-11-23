@@ -5,6 +5,7 @@ import { devtools } from "zustand/middleware";
 import { applyChallengeSuccess, getInitialProgress, setActiveZone } from "@/core/progress";
 import { writeCachedProgress } from "@/core/persistence";
 import type { ProgressState, ZoneId } from "@/core/types";
+import { challenges } from "@/blockly/challenges";
 
 interface GameStore extends ProgressState {
   isSyncing: boolean;
@@ -30,8 +31,9 @@ export const useGameStore = create<GameStore>()(
           writeCachedProgress(next);
           return next;
         }),
-      completeZone: (zoneId) => {
-        const next = applyChallengeSuccess(get(), zoneId);
+    completeZone: (zoneId) => {
+      const reward = challenges[zoneId]?.rewards;
+      const next = applyChallengeSuccess(get(), zoneId, reward);
         set(next);
         writeCachedProgress(next);
         return next;
