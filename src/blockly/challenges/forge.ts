@@ -6,6 +6,27 @@ export const forgeChallenge: ChallengeDefinition = {
   title: "Chauffer l'enclume",
   description:
     "Utilise une variable compteur pour chauffer l'enclume trois fois. Chaque coup de marteau incrémente le compteur.",
+  objectives: [
+    {
+      id: "init-counter",
+      label: "Préparer la variable",
+      description: "Crée une variable `coups` initialisée à 0 avant de commencer la séquence.",
+    },
+    {
+      id: "heat-forge",
+      label: "Monter en température",
+      description: "Incrémente le compteur au moins trois fois via `world_increment_counter`.",
+    },
+  ],
+  narrative: {
+    mentor: {
+      name: "Dorin",
+      title: "Maître Forgeron",
+    },
+    intro: "Chaque valeur que tu stockes est une braise. Nourris-la méthodiquement et la forge rougira.",
+    success: "Le métal chante : ta variable suit le rythme et la chaleur envahit l'atelier.",
+    failure: "La forge reste tiède. Vérifie l'initialisation et le nombre d'incréments.",
+  },
   toolboxXml: `
 <xml xmlns="https://developers.google.com/blockly/xml">
   <category name="Variables" colour="#f08a8d" custom="VARIABLE"></category>
@@ -47,6 +68,10 @@ export const forgeChallenge: ChallengeDefinition = {
     "world_increment_counter",
     "math_number",
   ],
+  hint: "Pense à relier la variable locale utilisée dans la boucle avec le compteur `forge` pour suivre la chaleur.",
+  rewards: {
+    xp: 160,
+  },
   validate: (result) => {
     const counters = (result.state.counters as Record<string, number>) ?? {};
     if ((counters.forge ?? 0) >= 3) {

@@ -8,6 +8,8 @@ const baseSelect = {
   completedZones: true,
   activeZone: true,
   lastChallengeId: true,
+  xp: true,
+  badges: true,
   updatedAt: true,
 };
 
@@ -26,6 +28,8 @@ const coerceState = (payload?: {
   completedZones: string[];
   activeZone: string | null;
   lastChallengeId: string | null;
+  xp: number;
+  badges: string[];
 }): ProgressState => {
   if (!payload) {
     return getInitialProgress();
@@ -35,6 +39,8 @@ const coerceState = (payload?: {
     unlockedZones: (payload.unlockedZones ?? ["village"]) as ZoneId[],
     completedZones: (payload.completedZones ?? []) as ZoneId[],
     lastChallengeId: payload.lastChallengeId as ZoneId | undefined,
+    xp: payload.xp ?? 0,
+    badges: payload.badges ?? [],
   });
 };
 
@@ -55,6 +61,8 @@ export const getProgressForUser = async (
         unlockedZones: initial.unlockedZones,
         completedZones: initial.completedZones,
         activeZone: initial.activeZone,
+          xp: initial.xp,
+          badges: initial.badges,
       },
     });
     return initial;
@@ -74,6 +82,8 @@ export const upsertProgressForUser = async (
       completedZones: state.completedZones,
       activeZone: state.activeZone,
       lastChallengeId: state.lastChallengeId,
+        xp: state.xp,
+        badges: state.badges,
     },
     create: {
       userId,
@@ -81,6 +91,8 @@ export const upsertProgressForUser = async (
       completedZones: state.completedZones,
       activeZone: state.activeZone,
       lastChallengeId: state.lastChallengeId,
+        xp: state.xp,
+        badges: state.badges,
     },
     select: baseSelect,
   });
@@ -99,12 +111,16 @@ export const resetProgressForUser = async (
       completedZones: initial.completedZones,
       activeZone: initial.activeZone,
       lastChallengeId: initial.lastChallengeId ?? null,
+        xp: initial.xp,
+        badges: initial.badges,
     },
     create: {
       userId,
       unlockedZones: initial.unlockedZones,
       completedZones: initial.completedZones,
       activeZone: initial.activeZone,
+        xp: initial.xp,
+        badges: initial.badges,
     },
   });
   await prisma.challengeStatus.deleteMany({
