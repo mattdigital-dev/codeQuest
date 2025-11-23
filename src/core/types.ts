@@ -30,12 +30,16 @@ export interface ProgressState {
   unlockedZones: ZoneId[];
   completedZones: ZoneId[];
   lastChallengeId?: ZoneId;
+  xp: number;
+  badges: string[];
 }
 
 export const initialProgressState: ProgressState = {
   activeZone: "village",
   unlockedZones: ["village"],
   completedZones: [],
+  xp: 0,
+  badges: [],
 };
 
 export interface SandboxExecutionResult {
@@ -63,6 +67,7 @@ export interface ChallengeDefinition {
   allowedBlocks: string[];
   validate: (result: SandboxExecutionResult) => ChallengeResult;
   hint?: string;
+  adaptiveHints?: string[];
   rewards?: ChallengeReward;
 }
 
@@ -88,6 +93,64 @@ export interface ChallengeObjective {
 export interface ChallengeReward {
   xp: number;
   badge?: string;
+}
+
+export type WeatherPreset = "dawn" | "sunset" | "storm" | "night" | "aurora" | "ember";
+
+export interface DailyAtmosphere {
+  weather: WeatherPreset;
+  skyColor: string;
+  fogColor: string;
+  fogRange?: [number, number];
+  ambientIntensity?: number;
+  directionalColor?: string;
+  directionalIntensity?: number;
+  starsVisible?: boolean;
+  particleColor?: string;
+  audioCue?: "chimes" | "pulse" | "storm" | "lullaby" | "embers";
+}
+
+export interface DailyChallengeNarrative {
+  intro: string;
+  success: string;
+  failure: string;
+  hints: string[];
+  atmosphere?: DailyAtmosphere;
+}
+
+export interface DailyChallenge {
+  id: string;
+  zoneId: ZoneId;
+  title: string;
+  bonusXp: number;
+  bonusBadge?: string;
+  seed: string;
+  expiresAt: string;
+  narrative: DailyChallengeNarrative;
+}
+
+export interface DailyChallengeSnapshot extends DailyChallenge {
+  alreadyCompleted: boolean;
+}
+
+export interface LeaderboardEntry {
+  userId: string;
+  displayName?: string | null;
+  xp: number;
+  badges: string[];
+  rank: number;
+}
+
+export interface RetentionMetrics {
+  windowDays: number;
+  totalCompletions: number;
+  uniquePlayers: number;
+  dailyBreakdown: {
+    date: string;
+    completions: number;
+    uniquePlayers: number;
+  }[];
+  completionRate?: number;
 }
 
 export type ChallengeMap = Record<ZoneId, ChallengeDefinition>;

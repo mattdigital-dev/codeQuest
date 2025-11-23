@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ProgressBar } from "@/components/ui/ProgressBar";
@@ -13,7 +13,7 @@ import { trpc } from "@/utils/trpc";
 import { challenges } from "@/blockly/challenges";
 
 export function GameHUD() {
-  const { hydrate, completedZones, activeZone } = useGameStore();
+  const { hydrate, completedZones, activeZone, xp, badges } = useGameStore();
   const { openChallenge, openCodex, closeCodex, codex } = useUIStore();
 
   useEffect(() => {
@@ -36,20 +36,49 @@ export function GameHUD() {
     (sum, zone) => sum + (challenges[zone.id]?.rewards?.xp ?? 0),
     0,
   );
-  const earnedXp = completedZones.reduce(
-    (sum, zoneId) => sum + (challenges[zoneId]?.rewards?.xp ?? 0),
-    0,
-  );
+  const earnedXp = xp;
   const nextZoneIndex = ZONES.findIndex((zone) => zone.id === activeZone) + 1;
   const nextZone = ZONES[nextZoneIndex];
+  const badgeCatalog = useMemo(() => {
+    const seen = new Set<string>();
+    return Object.values(challenges).reduce<string[]>((acc, challenge) => {
+      const badge = challenge.rewards?.badge;
+      if (!badge || seen.has(badge)) {
+        return acc;
+      }
+      seen.add(badge);
+      acc.push(badge);
+      return acc;
+    }, []);
+  }, []);
+  const dailyChallengeQuery = trpc.daily.current.useQuery(undefined, {
+    staleTime: 30_000,
+  });
+  const leaderboardQuery = trpc.daily.leaderboard.useQuery(undefined, {
+    staleTime: 60_000,
+  });
+  const dailyChallenge = dailyChallengeQuery.data;
+  const leaderboard = leaderboardQuery.data ?? [];
   const codexZoneId = codex.zoneId ?? activeZone;
   const codexZone = zoneById[codexZoneId];
   const codexChallenge = challenges[codexZoneId];
+  const weatherLabel = useMemo(() => {
+    if (!dailyChallenge?.narrative.atmosphere?.weather) return null;
+    const labels: Record<string, string> = {
+      dawn: "Aube nacrée",
+      sunset: "Coucher flamboyant",
+      storm: "Tempête électrique",
+      night: "Veille nocturne",
+      aurora: "Voiles boréals",
+      ember: "Brasiers sacrés",
+    };
+    return labels[dailyChallenge.narrative.atmosphere.weather] ?? null;
+  }, [dailyChallenge?.narrative.atmosphere?.weather]);
 
   return (
     <>
       <section className="pointer-events-none absolute left-6 top-6 flex w-[380px] flex-col gap-4">
-        <Card className="pointer-events-auto">
+          <Card className="pointer-events-auto">
           <header>
             <p className="text-xs uppercase text-dusk/60">Zone actuelle</p>
             <h2 className="text-2xl font-semibold text-dusk">{currentZone.name}</h2>
@@ -61,6 +90,28 @@ export function GameHUD() {
               {completedZones.length} / {totalZones} défis maîtrisés
             </p>
           </section>
+            {badgeCatalog.length ? (
+              <section className="mt-4 space-y-2" aria-label="Badges débloqués">
+                <p className="text-xs text-dusk/60">
+                  {badges.length} / {badgeCatalog.length} badges obtenus
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {badgeCatalog.map((badgeName) => {
+                    const unlocked = badges.includes(badgeName);
+                    return (
+                      <span
+                        key={badgeName}
+                        className={`rounded-full px-3 py-1 text-xs ${
+                          unlocked ? "bg-lagoon/40 text-dusk" : "bg-dusk/10 text-dusk/50"
+                        }`}
+                      >
+                        {badgeName}
+                      </span>
+                    );
+                  })}
+                </div>
+              </section>
+            ) : null}
           <section className="mt-4 space-y-2" aria-label="Expérience obtenue">
             <ProgressBar value={earnedXp} total={totalXpPool || 1} />
             <p className="text-xs text-dusk/60">
@@ -87,7 +138,7 @@ export function GameHUD() {
             </Button>
           </footer>
         </Card>
-        <Card className="pointer-events-auto">
+          <Card className="pointer-events-auto">
           <header>
             <p className="text-xs uppercase text-dusk/60">Mentorat</p>
             <h3 className="text-xl font-semibold text-dusk">
@@ -108,7 +159,78 @@ export function GameHUD() {
           <p className="mt-4 text-xs italic text-dusk/60">{currentChallenge.narrative.intro}</p>
         </Card>
       </section>
-      <Modal open={codex.isOpen} onClose={closeCodex}>
+        {dailyChallenge ? (
+          <section className="pointer-events-auto absolute right-6 top-6 flex w-[360px] flex-col gap-4">
+            <Card>
+              <header>
+                <p className="text-xs uppercase text-dusk/60">Défi quotidien</p>
+                <h3 className="text-xl font-semibold text-dusk">{dailyChallenge.title}</h3>
+                <p className="text-sm text-dusk/70">
+                  Zone : {zoneById[dailyChallenge.zoneId].name}
+                </p>
+              </header>
+              <dl className="mt-4 space-y-2 text-sm text-dusk/80">
+                <div className="flex items-center justify-between">
+                  <dt className="text-xs uppercase text-dusk/50">Bonus XP</dt>
+                  <dd className="font-semibold text-dusk">{dailyChallenge.bonusXp} XP</dd>
+                </div>
+                {dailyChallenge.bonusBadge ? (
+                  <div className="flex items-center justify-between">
+                    <dt className="text-xs uppercase text-dusk/50">Récompense</dt>
+                    <dd className="rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-dusk">
+                      {dailyChallenge.bonusBadge}
+                    </dd>
+                  </div>
+                ) : null}
+                <div className="flex items-center justify-between text-xs text-dusk/60">
+                  <span>Expire</span>
+                  <time dateTime={dailyChallenge.expiresAt}>
+                    {new Date(dailyChallenge.expiresAt).toLocaleTimeString("fr-FR", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </time>
+                </div>
+              </dl>
+              {weatherLabel ? (
+                <p className="mt-2 text-xs uppercase tracking-wide text-dusk/60">
+                  Ambiance : {weatherLabel}
+                </p>
+              ) : null}
+              <p className="mt-3 text-sm text-dusk/70">{dailyChallenge.narrative.intro}</p>
+              <Button
+                className="mt-4 w-full"
+                intent={dailyChallenge.alreadyCompleted ? "ghost" : "primary"}
+                disabled={dailyChallenge.alreadyCompleted}
+                onClick={() => openChallenge(dailyChallenge.zoneId)}
+              >
+                {dailyChallenge.alreadyCompleted ? "Défi validé" : "Relever le défi"}
+              </Button>
+            </Card>
+            {leaderboard.length ? (
+              <Card>
+                <header className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs uppercase text-dusk/60">Classement XP</p>
+                    <h3 className="text-lg font-semibold text-dusk">Top explorateurs</h3>
+                  </div>
+                  <span className="text-xs text-dusk/50">Actualisé</span>
+                </header>
+                <ol className="mt-4 space-y-2 text-sm text-dusk/80">
+                  {leaderboard.slice(0, 5).map((entry) => (
+                    <li key={entry.userId} className="flex items-center justify-between rounded-2xl bg-white/70 px-3 py-2">
+                      <span className="font-semibold text-dusk">
+                        #{entry.rank} {entry.displayName ?? "Anonyme"}
+                      </span>
+                      <span className="text-xs text-dusk/60">{entry.xp} XP</span>
+                    </li>
+                  ))}
+                </ol>
+              </Card>
+            ) : null}
+          </section>
+        ) : null}
+        <Modal open={codex.isOpen} onClose={closeCodex}>
         <section className="flex h-[65vh] flex-col gap-4" aria-labelledby="codex-title">
           <header className="flex items-start justify-between gap-4">
             <div>

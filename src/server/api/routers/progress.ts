@@ -15,6 +15,8 @@ const progressStateSchema = z.object({
   unlockedZones: z.array(zoneSchema),
   completedZones: z.array(zoneSchema),
   lastChallengeId: zoneSchema.optional(),
+  xp: z.number().int().min(0),
+  badges: z.array(z.string()),
 });
 
 export const progressRouter = router({

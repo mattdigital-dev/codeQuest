@@ -13,7 +13,7 @@ import { trpc } from "@/utils/trpc";
 import type { ChallengeResult } from "@/core/types";
 
 export function ChallengeOverlay() {
-  const { overlay, closeChallenge } = useUIStore();
+  const { overlay, closeChallenge, mentorHints, increaseHintLevel, resetHintLevel } = useUIStore();
   const { completeZone, hydrate } = useGameStore();
   const [code, setCode] = useState("");
   const [isRunning, setIsRunning] = useState(false);
@@ -25,17 +25,69 @@ export function ChallengeOverlay() {
   const upsert = trpc.progress.upsert.useMutation({
     onSuccess: (data) => hydrate(data),
   });
+  const utils = trpc.useUtils();
+  const dailyChallenge = trpc.daily.current.useQuery(undefined, { staleTime: 30_000 });
+  const claimDaily = trpc.daily.claim.useMutation({
+    onSuccess: (data) => {
+      hydrate(data.progress);
+      utils.daily.current.invalidate();
+      utils.daily.leaderboard.invalidate();
+    },
+  });
+  const telemetry = trpc.telemetry.emit.useMutation();
+  const emitTelemetry = (eventType: string, payload?: Record<string, unknown>) => {
+    telemetry.mutate({ eventType, payload });
+  };
+  const activeDailyChallenge =
+    overlay.zoneId && dailyChallenge.data && dailyChallenge.data.zoneId === overlay.zoneId
+      ? dailyChallenge.data
+      : null;
 
   const runChallenge = async () => {
     if (!challenge || !overlay.zoneId) return;
     setIsRunning(true);
+    const startTimestamp = typeof performance !== "undefined" ? performance.now() : Date.now();
     const sandboxResult = await executeBlocklyCode({ code });
     setLogs(sandboxResult.logs);
     const validation = challenge.validate(sandboxResult);
     setFeedback(validation);
-    if (validation.success) {
-      const newState = completeZone(overlay.zoneId);
-      upsert.mutate(newState);
+    const durationMs =
+      (typeof performance !== "undefined" ? performance.now() : Date.now()) - startTimestamp;
+    const zoneId = overlay.zoneId;
+    const currentHintLevel = mentorHints[zoneId] ?? 0;
+    emitTelemetry("challenge_attempt", {
+      zoneId,
+      success: validation.success,
+      durationMs: Math.round(durationMs),
+      hintLevel: currentHintLevel,
+      logsCount: sandboxResult.logs.length,
+      codeSize: code.length,
+    });
+      if (validation.success) {
+        const newState = completeZone(zoneId);
+        upsert.mutate(newState);
+        resetHintLevel(zoneId);
+        if (
+          dailyChallenge.data &&
+          dailyChallenge.data.zoneId === zoneId &&
+          !dailyChallenge.data.alreadyCompleted
+        ) {
+          claimDaily.mutate({ zoneId });
+          emitTelemetry("daily_challenge_completed", {
+            zoneId,
+            bonusXp: dailyChallenge.data.bonusXp,
+            badge: dailyChallenge.data.bonusBadge,
+          });
+        }
+      }
+    if (!validation.success) {
+      const nextLevel = increaseHintLevel(zoneId);
+      emitTelemetry("mentor_hint_level_changed", {
+        zoneId,
+        from: currentHintLevel,
+        to: nextLevel,
+        lastMessage: validation.message,
+      });
     }
     setIsRunning(false);
   };
@@ -50,19 +102,58 @@ export function ChallengeOverlay() {
     if (!challenge) {
       return "";
     }
+    if (activeDailyChallenge) {
+      if (!feedback) {
+        return activeDailyChallenge.narrative.intro;
+      }
+      return feedback.success
+        ? activeDailyChallenge.narrative.success
+        : activeDailyChallenge.narrative.failure;
+    }
     if (!feedback) {
       return challenge.narrative.intro;
     }
     return feedback.success ? challenge.narrative.success : challenge.narrative.failure;
-  }, [challenge, feedback]);
+  }, [challenge, feedback, activeDailyChallenge]);
+
+  const hintLevel = overlay.zoneId ? mentorHints[overlay.zoneId] ?? 0 : 0;
+  const adaptiveHint = useMemo(() => {
+    if (!challenge || hintLevel <= 0) {
+      return null;
+    }
+    const dailyHints = activeDailyChallenge?.narrative.hints ?? [];
+    if (activeDailyChallenge && dailyHints.length) {
+      const index = Math.min(dailyHints.length - 1, hintLevel - 1);
+      return dailyHints[index];
+    }
+    if (hintLevel === 1) {
+      return challenge.hint ?? challenge.adaptiveHints?.[0] ?? null;
+    }
+    const hints = challenge.adaptiveHints ?? [];
+    if (!hints.length) {
+      return challenge.hint ?? null;
+    }
+    const index = Math.min(hints.length - 1, hintLevel - 2);
+    return hints[index];
+  }, [challenge, hintLevel, activeDailyChallenge]);
+
+  const baseHint = activeDailyChallenge?.narrative.hints[0] ?? challenge?.hint;
+  const displayedHint = adaptiveHint ?? baseHint ?? null;
 
   return (
     <Modal open={overlay.isOpen} onClose={close}>
       {challenge ? (
         <section className="flex h-[70vh] flex-col gap-4" aria-labelledby="challenge-title">
-          <header className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <p className="text-xs uppercase text-dusk/60">{challenge.zoneName}</p>
+            <header className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs uppercase text-dusk/60">{challenge.zoneName}</p>
+                  {activeDailyChallenge ? (
+                    <span className="rounded-full bg-lagoon/30 px-3 py-1 text-[10px] font-semibold uppercase text-dusk">
+                      Défi quotidien
+                    </span>
+                  ) : null}
+                </div>
               <h2 id="challenge-title" className="text-2xl font-semibold text-dusk">
                 {challenge.title}
               </h2>
@@ -116,9 +207,9 @@ export function ChallengeOverlay() {
                   </p>
                 </header>
                 <p className="mt-2 text-sm text-dusk/80">{mentorLine}</p>
-                {challenge.hint ? (
-                  <p className="mt-3 text-xs italic text-dusk/60">Indice : {challenge.hint}</p>
-                ) : null}
+                  {displayedHint ? (
+                    <p className="mt-3 text-xs italic text-dusk/60">Indice : {displayedHint}</p>
+                  ) : null}
               </section>
               <section
                 aria-labelledby="execution-title"
