@@ -1,0 +1,29 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: light;
+  --cloud-top: #f6f0ff;
+  --cloud-bottom: #d4ecff;
+  --text-main: #1f1b24;
+  --text-muted: #4f4b57;
+  --glass: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.25);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: linear-gradient(180deg, var(--cloud-top) 0%, var(--cloud-bottom) 100%);
+  color: var(--text-main);
+  font-family: var(--font-display), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.bg-cloud {
+  background: linear-gradient(180deg, var(--cloud-top) 0%, var(--cloud-bottom) 100%);
+}
+
+.glass-panel {
+  backdrop-filter: blur(12px);
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+}
