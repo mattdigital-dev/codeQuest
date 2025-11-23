@@ -6,6 +6,27 @@ export const towerChallenge: ChallengeDefinition = {
   title: "Répondre aux signaux",
   description:
     "La tour reçoit deux signaux : « gong » et « clairon ». Écoute ces événements et allume les lumières correspondantes.",
+  objectives: [
+    {
+      id: "emit-signals",
+      label: "Émettre gong et clairon",
+      description: "Assure-toi que les deux événements sont envoyés dans la séquence.",
+    },
+    {
+      id: "react-lights",
+      label: "Allumer la tour",
+      description: "Allume le totem lorsque les signaux requis ont été reçus.",
+    },
+  ],
+  narrative: {
+    mentor: {
+      name: "Lumen",
+      title: "Vigie de la Tour",
+    },
+    intro: "Les signaux orchestrent la lumière. Capte-les, réponds-y, et la tour dansera.",
+    success: "La tour pulse au rythme des deux appels — tes réactions sont impeccables.",
+    failure: "Il manque un signal ou une action. Vérifie l'ordre des événements et la lumière ciblée.",
+  },
   toolboxXml: `
 <xml xmlns="https://developers.google.com/blockly/xml">
   <category name="Événements" colour="#7fb2ff">
@@ -50,6 +71,10 @@ export const towerChallenge: ChallengeDefinition = {
     "logic_compare",
     "logic_boolean",
   ],
+  hint: "Stocke les événements dans des variables ou vérifie la séquence avant de déclencher la lumière.",
+  rewards: {
+    xp: 190,
+  },
   validate: (result) => {
     const sequence = (result.state.sequence as string[]) ?? [];
     const lights = (result.state.lights as Record<string, boolean>) ?? {};

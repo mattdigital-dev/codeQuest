@@ -6,6 +6,28 @@ export const forestChallenge: ChallengeDefinition = {
   title: "Tracer un sentier répétitif",
   description:
     "Répète l'action de pose de balise 4 fois pour baliser la forêt. Utilise un bloc de boucle pour éviter la répétition manuelle.",
+  objectives: [
+    {
+      id: "repeat-beacon",
+      label: "Planter 4 balises",
+      description: "Utilise une boucle pour émettre l'événement `pas` quatre fois.",
+    },
+    {
+      id: "mark-path",
+      label: "Déplacer le marqueur",
+      description: "Optionnel : fais avancer le marqueur via `world_move_marker` pour visualiser la progression.",
+      optional: true,
+    },
+  ],
+  narrative: {
+    mentor: {
+      name: "Rae",
+      title: "Traceur de la Canopée",
+    },
+    intro: "Dans la forêt, rien ne se répète au hasard. Compose un rythme net et la lumière te guidera.",
+    success: "Les arbres chantent ta boucle : le sentier est régulier et les spores s'alignent.",
+    failure: "Ton motif manque de battements. Vérifie le nombre d'itérations et l'action exécutée.",
+  },
   toolboxXml: `
 <xml xmlns="https://developers.google.com/blockly/xml">
   <category name="Boucles" colour="#8ed1c2">
@@ -45,6 +67,10 @@ export const forestChallenge: ChallengeDefinition = {
 </xml>
 `,
   allowedBlocks: ["controls_repeat_ext", "world_push_event", "world_move_marker", "math_number"],
+  hint: "Appuie-toi sur `controls_repeat_ext` avec la valeur 4 en entrée pour éviter les duplications.",
+  rewards: {
+    xp: 80,
+  },
   validate: (result) => {
     const sequence = (result.state.sequence as string[]) ?? [];
     const steps = sequence.filter((event) => event === "pas").length;

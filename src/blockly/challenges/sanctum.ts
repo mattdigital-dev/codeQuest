@@ -6,6 +6,27 @@ export const sanctumChallenge: ChallengeDefinition = {
   title: "Rituel d'harmonie",
   description:
     "Active simultanément les cristaux, le pont et le totem, en enregistrant trois coups de forge et un signal final.",
+  objectives: [
+    {
+      id: "ignite-pillars",
+      label: "Synchroniser les lumières",
+      description: "Active crystal, bridge et totem dans la même séquence.",
+    },
+    {
+      id: "seal-ritual",
+      label: "Accomplir le rituel",
+      description: "Compter trois frappes de forge puis envoyer l'événement `rituel` final.",
+    },
+  ],
+  narrative: {
+    mentor: {
+      name: "Elyon",
+      title: "Gardien du Sanctuaire",
+    },
+    intro: "Toutes tes connaissances convergent ici. Orchestre les flux avec calme et précision.",
+    success: "Un halo doré t'entoure : tu as harmonisé les îles, le portail s'ouvre.",
+    failure: "L'équilibre n'est pas encore parfait. Vérifie chaque pilier et le nombre exact de frappes.",
+  },
   toolboxXml: `
 <xml xmlns="https://developers.google.com/blockly/xml">
   <category name="Actions" colour="#f6e7c1">
@@ -80,6 +101,11 @@ export const sanctumChallenge: ChallengeDefinition = {
     "world_push_event",
     "math_number",
   ],
+  hint: "Ordonne la boucle pour la forge avant d'activer les lumières puis termine par l'événement `rituel`.",
+  rewards: {
+    xp: 260,
+    badge: "Harmonie Primordiale",
+  },
   validate: (result) => {
     const sequence = (result.state.sequence as string[]) ?? [];
     const counters = (result.state.counters as Record<string, number>) ?? {};
