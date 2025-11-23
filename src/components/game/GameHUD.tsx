@@ -62,6 +62,18 @@ export function GameHUD() {
   const codexZoneId = codex.zoneId ?? activeZone;
   const codexZone = zoneById[codexZoneId];
   const codexChallenge = challenges[codexZoneId];
+  const weatherLabel = useMemo(() => {
+    if (!dailyChallenge?.narrative.atmosphere?.weather) return null;
+    const labels: Record<string, string> = {
+      dawn: "Aube nacrée",
+      sunset: "Coucher flamboyant",
+      storm: "Tempête électrique",
+      night: "Veille nocturne",
+      aurora: "Voiles boréals",
+      ember: "Brasiers sacrés",
+    };
+    return labels[dailyChallenge.narrative.atmosphere.weather] ?? null;
+  }, [dailyChallenge?.narrative.atmosphere?.weather]);
 
   return (
     <>
@@ -180,6 +192,11 @@ export function GameHUD() {
                   </time>
                 </div>
               </dl>
+              {weatherLabel ? (
+                <p className="mt-2 text-xs uppercase tracking-wide text-dusk/60">
+                  Ambiance : {weatherLabel}
+                </p>
+              ) : null}
               <p className="mt-3 text-sm text-dusk/70">{dailyChallenge.narrative.intro}</p>
               <Button
                 className="mt-4 w-full"

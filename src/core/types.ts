@@ -95,6 +95,29 @@ export interface ChallengeReward {
   badge?: string;
 }
 
+export type WeatherPreset = "dawn" | "sunset" | "storm" | "night" | "aurora" | "ember";
+
+export interface DailyAtmosphere {
+  weather: WeatherPreset;
+  skyColor: string;
+  fogColor: string;
+  fogRange?: [number, number];
+  ambientIntensity?: number;
+  directionalColor?: string;
+  directionalIntensity?: number;
+  starsVisible?: boolean;
+  particleColor?: string;
+  audioCue?: "chimes" | "pulse" | "storm" | "lullaby" | "embers";
+}
+
+export interface DailyChallengeNarrative {
+  intro: string;
+  success: string;
+  failure: string;
+  hints: string[];
+  atmosphere?: DailyAtmosphere;
+}
+
 export interface DailyChallenge {
   id: string;
   zoneId: ZoneId;
@@ -108,13 +131,6 @@ export interface DailyChallenge {
 
 export interface DailyChallengeSnapshot extends DailyChallenge {
   alreadyCompleted: boolean;
-}
-
-export interface DailyChallengeNarrative {
-  intro: string;
-  success: string;
-  failure: string;
-  hints: string[];
 }
 
 export interface LeaderboardEntry {
